@@ -1591,16 +1591,29 @@ $webSql .= " ORDER BY id DESC";
 
     if (isset($_POST['delete_niche'])) {
         $nicheId = (int)($_POST['niche_id'] ?? 0);
-        if ($nicheId > 0) {
-            $stmt = $pdo->prepare('DELETE FROM niches WHERE id = ?');
-            $stmt->execute([$nicheId]);
+        if ($nicheId > 0 && \App\NicheManager::deleteNiche($nicheId)) {
             $_SESSION['flash_message'] = 'Niche deleted.';
             $_SESSION['flash_type'] = 'success';
         } else {
-            $_SESSION['flash_message'] = 'Invalid niche selected.';
+            $_SESSION['flash_message'] = 'Invalid niche selected or delete failed.';
             $_SESSION['flash_type'] = 'danger';
         }
         header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['update_niche'])) {
+        $nicheId = (int)($_POST['niche_id'] ?? 0);
+        $name = trim((string)($_POST['niche_name'] ?? ''));
+        $description = trim((string)($_POST['niche_description'] ?? ''));
+        if ($nicheId > 0 && $name !== '' && \App\NicheManager::updateNiche($nicheId, $name, $description)) {
+            $_SESSION['flash_message'] = 'Niche updated successfully.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_message'] = 'Invalid niche data or update failed.';
+            $_SESSION['flash_type'] = 'danger';
+        }
+        header('Location: admin.php#niche-management');
         exit;
     }
 
@@ -1608,8 +1621,7 @@ $webSql .= " ORDER BY id DESC";
         $nicheId = (int)($_POST['niche_id'] ?? 0);
         $type = trim((string)($_POST['source_type'] ?? 'rss')) === 'web' ? 'web' : 'rss';
         $url = trim((string)($_POST['source_url'] ?? ''));
-        if ($nicheId > 0 && $url !== '') {
-            \App\NicheManager::addSource($nicheId, $type, $url);
+        if ($nicheId > 0 && $url !== '' && \App\NicheManager::addSource($nicheId, $type, $url)) {
             $_SESSION['flash_message'] = 'Source added.';
             $_SESSION['flash_type'] = 'success';
         } else {
@@ -1643,27 +1655,10 @@ $webSql .= " ORDER BY id DESC";
             $uniqueUrls[$url] = true;
         }
 
-        $pdo->beginTransaction();
-        try {
-            $deleteStmt = $pdo->prepare('DELETE FROM niche_sources WHERE niche_id = ? AND type = ?');
-            $deleteStmt->execute([$nicheId, $type]);
-
-            $inserted = 0;
-            if (!empty($uniqueUrls)) {
-                $insertStmt = $pdo->prepare('INSERT INTO niche_sources (niche_id, type, url) VALUES (?, ?, ?)');
-                foreach (array_keys($uniqueUrls) as $url) {
-                    $insertStmt->execute([$nicheId, $type, $url]);
-                    $inserted++;
-                }
-            }
-            $pdo->commit();
-
-            $_SESSION['flash_message'] = strtoupper($type) . " sources replaced successfully ({$inserted} source(s)).";
+        if (\App\NicheManager::replaceSources($nicheId, $type, array_keys($uniqueUrls))) {
+            $_SESSION['flash_message'] = strtoupper($type) . " sources replaced successfully (" . count($uniqueUrls) . " source(s)).";
             $_SESSION['flash_type'] = 'success';
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
+        } else {
             $_SESSION['flash_message'] = 'Could not replace niche sources. Please try again.';
             $_SESSION['flash_type'] = 'danger';
         }
@@ -1673,14 +1668,14 @@ $webSql .= " ORDER BY id DESC";
     }
 
     if (isset($_POST['remove_niche_source'])) {
-        $sourceId = (int)($_POST['source_id'] ?? 0);
-        if ($sourceId > 0) {
-            $stmt = $pdo->prepare('DELETE FROM niche_sources WHERE id = ?');
-            $stmt->execute([$sourceId]);
+        $nicheId = (int)($_POST['niche_id'] ?? 0);
+        $type = trim((string)($_POST['source_type'] ?? '')) === 'web' ? 'web' : 'rss';
+        $url = trim((string)($_POST['source_url'] ?? ''));
+        if ($nicheId > 0 && $url !== '' && \App\NicheManager::removeSource($nicheId, $type, $url)) {
             $_SESSION['flash_message'] = 'Source removed.';
             $_SESSION['flash_type'] = 'success';
         } else {
-            $_SESSION['flash_message'] = 'Invalid source selected.';
+            $_SESSION['flash_message'] = 'Invalid source selected or remove failed.';
             $_SESSION['flash_type'] = 'danger';
         }
         header('Location: admin.php');
@@ -2678,29 +2673,115 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                                 </div>
 
                                 <?php
-                                    $srcStmt = $pdo->prepare('SELECT id, type, url FROM niche_sources WHERE niche_id = ? ORDER BY id');
-                                    $srcStmt->execute([(int)$n['id']]);
-                                    $sources = $srcStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                                    $sourceGroups = \App\NicheManager::getNicheSources((int)$n['id']);
                                 ?>
                                 <div class="collapse mt-2" id="niche-details-<?= (int)$n['id'] ?>">
-                                <div class="small">
-                                    <?php if (empty($sources)): ?>
-                                        <em class="text-secondary">No sources configured.</em>
-                                    <?php else: ?>
-                                        <?php foreach ($sources as $s): ?>
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div><strong>[<?= e($s['type']) ?>]</strong> <?= e($s['url']) ?></div>
-                                                <form method="post" class="ms-2">
-                                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                                    <input type="hidden" name="source_id" value="<?= (int)$s['id'] ?>">
-                                                    <button name="remove_niche_source" class="btn btn-sm btn-outline-light">Remove</button>
-                                                </form>
+                                <div class="row g-2">
+                                    <div class="col-12 mb-3">
+                                        <form method="post" class="row g-2 align-items-end">
+                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                            <div class="col-sm-4">
+                                                <label class="form-label">Niche Name</label>
+                                                <input type="text" name="niche_name" class="form-control" value="<?= e($n['name']) ?>" required>
                                             </div>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </div>
+                                            <div class="col-sm-6">
+                                                <label class="form-label">Description</label>
+                                                <input type="text" name="niche_description" class="form-control" value="<?= e($n['description']) ?>">
+                                            </div>
+                                            <div class="col-sm-2">
+                                                <button name="update_niche" class="btn btn-sm btn-outline-primary w-100">Update</button>
+                                            </div>
+                                        </form>
+                                    </div>
 
-                                <form method="post" class="row g-2 mt-2">
+                                    <div class="col-12">
+                                        <div class="small mb-2 text-secondary">Sources:</div>
+                                        <?php if (empty($sourceGroups['rss']) && empty($sourceGroups['web'])): ?>
+                                            <em class="text-secondary">No sources configured.</em>
+                                        <?php else: ?>
+                                            <?php if (!empty($sourceGroups['rss'])): ?>
+                                                <div class="mb-2">
+                                                    <strong>RSS Sources</strong>
+                                                    <?php foreach ($sourceGroups['rss'] as $url): ?>
+                                                        <div class="d-flex justify-content-between align-items-center py-1">
+                                                            <div><strong>[rss]</strong> <?= e($url) ?></div>
+                                                            <form method="post" class="ms-2">
+                                                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                                                <input type="hidden" name="source_url" value="<?= e($url) ?>">
+                                                                <input type="hidden" name="source_type" value="rss">
+                                                                <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                                                <button name="remove_niche_source" class="btn btn-sm btn-outline-light">Remove</button>
+                                                            </form>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            <?php if (!empty($sourceGroups['web'])): ?>
+                                                <div class="mb-2">
+                                                    <strong>Web Sources</strong>
+                                                    <?php foreach ($sourceGroups['web'] as $url): ?>
+                                                        <div class="d-flex justify-content-between align-items-center py-1">
+                                                            <div><strong>[web]</strong> <?= e($url) ?></div>
+                                                            <form method="post" class="ms-2">
+                                                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                                                <input type="hidden" name="source_url" value="<?= e($url) ?>">
+                                                                <input type="hidden" name="source_type" value="web">
+                                                                <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                                                <button name="remove_niche_source" class="btn btn-sm btn-outline-light">Remove</button>
+                                                            </form>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <form method="post" class="row g-2">
+                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                            <div class="col-12 col-md-3">
+                                                <label class="form-label">Source Type</label>
+                                                <select name="source_type" class="form-select">
+                                                    <option value="rss">RSS</option>
+                                                    <option value="web">Web</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label">Source URL</label>
+                                                <input type="url" name="source_url" class="form-control" placeholder="https://example.com/feed.xml" required>
+                                            </div>
+                                            <div class="col-12 col-md-3 d-grid">
+                                                <button name="add_niche_source" class="btn btn-outline-light">Save Source</button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <form method="post" class="row g-2">
+                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
+                                            <div class="col-md-3">
+                                                <label class="form-label">Replace Type</label>
+                                                <select name="source_type" class="form-select">
+                                                    <option value="rss">Replace RSS List</option>
+                                                    <option value="web">Replace Web List</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <label class="form-label">Source URLs</label>
+                                                <textarea name="source_urls_bulk" class="form-control" rows="3" placeholder="Paste one URL per line"></textarea>
+                                            </div>
+                                            <div class="col-md-2 d-grid">
+                                                <button name="replace_niche_sources" class="btn btn-outline-warning w-100" onclick="return confirm('This will replace all existing sources of this type for this niche. Continue?');">Replace</button>
+                                            </div>
+                                            <div class="col-12">
+                                                <small class="text-secondary">لكل نيش قائمة مستقلة بالكامل للمصادر. يمكنك لصق قائمة روابط كاملة وسيتم استبدالها دفعة واحدة.</small>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                                     <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                                     <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
                                     <div class="col-4">

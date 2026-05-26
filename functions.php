@@ -77,9 +77,19 @@ function seedDefaultNiches() {
  */
 function getActiveNicheId() {
     $slug = getActiveNicheSlug();
-    if (!class_exists('App\\NicheManager')) return 1;
+    if (!class_exists('App\\NicheManager')) {
+        return 1;
+    }
+
     $niche = \App\NicheManager::getNicheBySlug($slug);
-    return $niche ? (int)$niche['id'] : 1;
+    if ($niche) {
+        return (int)$niche['id'];
+    }
+
+    $stmt = db_connect()->prepare("SELECT id FROM niches ORDER BY id LIMIT 1");
+    $stmt->execute();
+    $firstId = $stmt->fetchColumn();
+    return $firstId ? (int)$firstId : 1;
 }
 
 function getActiveNicheInfo($slug = '') {
@@ -151,29 +161,32 @@ function getNicheArticleMeta($slug = '') {
 /**
  * Get RSS sources for a specific niche (or active niche if not specified)
  */
-function getNicheRssSources($nicheSlug = '') {
-    if ($nicheSlug === '') $nicheSlug = getActiveNicheSlug();
-    if (!class_exists('App\\NicheManager')) return [];
-    
+function getNicheSources($nicheSlug = '', $type = '') {
+    if ($nicheSlug === '') {
+        $nicheSlug = getActiveNicheSlug();
+    }
+    if (!class_exists('App\\NicheManager')) {
+        return [];
+    }
+
     $niche = \App\NicheManager::getNicheBySlug($nicheSlug);
-    if (!$niche) return [];
-    
-    $sources = \App\NicheManager::getSourcesForNiche((int)$niche['id'], 'rss');
-    return array_map(function($s) { return $s['url']; }, $sources);
+    if (!$niche) {
+        return [];
+    }
+
+    $sources = \App\NicheManager::getSourcesForNiche((int)$niche['id'], $type);
+    return array_column($sources, 'url');
+}
+
+function getNicheRssSources($nicheSlug = '') {
+    return getNicheSources($nicheSlug, 'rss');
 }
 
 /**
  * Get web sources for a specific niche (or active niche if not specified)
  */
 function getNicheWebSources($nicheSlug = '') {
-    if ($nicheSlug === '') $nicheSlug = getActiveNicheSlug();
-    if (!class_exists('App\\NicheManager')) return [];
-    
-    $niche = \App\NicheManager::getNicheBySlug($nicheSlug);
-    if (!$niche) return [];
-    
-    $sources = \App\NicheManager::getSourcesForNiche((int)$niche['id'], 'web');
-    return array_map(function($s) { return $s['url']; }, $sources);
+    return getNicheSources($nicheSlug, 'web');
 }
 
 /**
