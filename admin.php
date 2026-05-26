@@ -1,6 +1,16 @@
 <?php
-session_start();
 require_once 'functions.php';
+
+if (!function_exists('endsWith')) {
+    function endsWith($haystack, $needle) {
+        $haystack = (string)$haystack;
+        $needle = (string)$needle;
+        if ($needle === '') {
+            return true;
+        }
+        return substr($haystack, -strlen($needle)) === $needle;
+    }
+}
 
 $siteTitle = getSiteTitle();
 
@@ -872,7 +882,7 @@ if ($requestMethod === 'POST') {
             if ($type === 'auto') {
                 $path = strtolower((string)parse_url($u, PHP_URL_PATH));
                 $query = strtolower((string)parse_url($u, PHP_URL_QUERY));
-                $type = (strpos($path, 'feed') !== false || str_ends_with($path, '.xml') || str_ends_with($path, '.rss') || str_ends_with($path, '.atom') || strpos($query, 'feed=') !== false)
+                $type = (strpos($path, 'feed') !== false || endsWith($path, '.xml') || endsWith($path, '.rss') || endsWith($path, '.atom') || strpos($query, 'feed=') !== false)
                     ? 'rss' : 'web';
             }
             if ($type === 'rss') $detectedRss++; else $detectedWeb++;
@@ -1611,7 +1621,7 @@ $webSql .= " ORDER BY id DESC";
         $nicheId = (int)($_POST['niche_id'] ?? 0);
         $type = trim((string)($_POST['source_type'] ?? 'rss')) === 'web' ? 'web' : 'rss';
         $url = trim((string)($_POST['source_url'] ?? ''));
-        if ($nicheId > 0 && $url !== '' && \App\NicheManager::addSource($nicheId, $type, $url)) {
+        if ($nicheId > 0 && $url !== '' && filter_var($url, FILTER_VALIDATE_URL) && \App\NicheManager::addSource($nicheId, $type, $url)) {
             $_SESSION['flash_message'] = 'Source added.';
             $_SESSION['flash_type'] = 'success';
         } else {
@@ -1643,6 +1653,13 @@ $webSql .= " ORDER BY id DESC";
                 continue;
             }
             $uniqueUrls[$url] = true;
+        }
+
+        if ($bulkInput !== '' && empty($uniqueUrls)) {
+            $_SESSION['flash_message'] = 'No valid URLs were provided. Please enter at least one valid URL or leave the field empty to clear sources.';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: admin.php#niche-management');
+            exit;
         }
 
         if (\App\NicheManager::replaceSources($nicheId, $type, array_keys($uniqueUrls))) {
@@ -2772,42 +2789,7 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                                         </form>
                                     </div>
                                 </div>
-                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                    <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                    <div class="col-4">
-                                        <select name="source_type" class="form-select">
-                                            <option value="rss">RSS</option>
-                                            <option value="web">Web</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-6">
-                                        <input type="url" name="source_url" class="form-control" placeholder="https://example.com/feed.xml" required>
-                                    </div>
-                                    <div class="col-2">
-                                        <button name="add_niche_source" class="btn btn-outline-light w-100">Save Source</button>
-                                    </div>
-                                </form>
-
-
-                                <form method="post" class="row g-2 mt-2">
-                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                    <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                    <div class="col-md-3">
-                                        <select name="source_type" class="form-select">
-                                            <option value="rss">Replace RSS List</option>
-                                            <option value="web">Replace Web List</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-7">
-                                        <textarea name="source_urls_bulk" class="form-control" rows="3" placeholder="Paste one URL per line"></textarea>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <button name="replace_niche_sources" class="btn btn-outline-warning w-100" onclick="return confirm('This will replace all existing sources of this type for this niche. Continue?');">Replace</button>
-                                    </div>
-                                    <div class="col-12">
-                                        <small class="text-secondary">لكل نيش قائمة مستقلة بالكامل للمصادر. يمكنك لصق قائمة روابط كاملة وسيتم استبدالها دفعة واحدة.</small>
-                                    </div>
-                                </form>
+                                </div>
                                 <form method="post" class="row g-2 mt-3 border-top pt-2">
                                     <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                                     <input type="hidden" name="niche_title_slug" value="<?= e($n['slug']) ?>">
@@ -2990,11 +2972,11 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
 
                                     <!-- تحسينات ذكية: عرض ملخص لكل نيش وعدد المقالات والمصادر -->
                                     <?php
-                                        $nicheArticleCountStmt = $pdo->prepare('SELECT category, COUNT(*) AS total FROM articles GROUP BY category');
+                                        $nicheArticleCountStmt = $pdo->prepare('SELECT niche_id, COUNT(*) AS total FROM articles GROUP BY niche_id');
                                         $nicheArticleCountStmt->execute();
                                         $nicheArticleCounts = [];
                                         foreach ($nicheArticleCountStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                                            $nicheArticleCounts[(string)($row['category'] ?? '')] = (int)($row['total'] ?? 0);
+                                            $nicheArticleCounts[(int)($row['niche_id'] ?? 0)] = (int)($row['total'] ?? 0);
                                         }
 
                                         $nicheSourceCountStmt = $pdo->prepare('SELECT niche_id, COUNT(*) AS total FROM niche_sources GROUP BY niche_id');

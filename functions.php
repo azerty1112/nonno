@@ -322,35 +322,18 @@ function getArticleStats($articleId) {
     ];
 }
 
-function getTrendingArticles($limit = 10, $nicheId = null) {
+function getTrendingArticles($limit = 10) {
     $pdo = db_connect();
-    $whereClause = '';
-    $params = [];
-    if ($nicheId !== null) {
-        if ($nicheId === 1) {
-            $whereClause = 'WHERE (a.niche_id = :niche_id OR a.niche_id IS NULL)';
-        } else {
-            $whereClause = 'WHERE a.niche_id = :niche_id';
-        }
-        $params['niche_id'] = $nicheId;
-    }
-
     $stmt = $pdo->prepare("
         SELECT a.id, a.title, a.slug, a.excerpt, a.image, a.published_at,
                a.image2, a.translated_title,
                s.views, s.avg_rating, s.rating_count
         FROM articles a
         LEFT JOIN article_stats s ON a.id = s.article_id
-        $whereClause
         ORDER BY COALESCE(s.views, 0) DESC
-        LIMIT :limit
+        LIMIT ?
     ");
-
-    if ($nicheId !== null) {
-        $stmt->bindValue(':niche_id', (int)$nicheId, PDO::PARAM_INT);
-    }
-    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-    $stmt->execute();
+    $stmt->execute([(int)$limit]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
@@ -1050,20 +1033,8 @@ function runRssWorkflow($limit = null) {
 }
 
 function runWebWorkflow($limit = null) {
-    $pdo = db_connect();
     $activeNiche = getActiveNicheSlug();
-    $nicheId = getActiveNicheId();
-
-    $stmt = $pdo->prepare("SELECT url FROM niche_sources WHERE niche_id = ? AND type = 'web' ORDER BY id DESC");
-    $stmt->execute([$nicheId]);
-    $sources = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-
-    if (empty($sources)) {
-        $stmt = $pdo->prepare("SELECT url FROM web_sources ORDER BY id DESC");
-        $stmt->execute();
-        $sources = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-    }
-
+    $sources = getNicheWebSources($activeNiche) ?: [];
     $limit = $limit === null ? max(1, (int)getSetting('daily_limit', 5)) : max(1, (int)$limit);
     $batchSize = getSettingInt('workflow_batch_size', 8, 1, 30);
 
@@ -1129,23 +1100,17 @@ function runSelectedContentWorkflow($limit = null) {
 }
 
 function getContentWorkflowSummary() {
-    $selected = getSelectedContentWorkflow();
-    $activeNiche = getActiveNicheSlug();
-    $nicheRssSources = getNicheRssSources($activeNiche);
-    $nicheWebSources = getNicheWebSources($activeNiche);
-
     $pdo = db_connect();
+    $selected = getSelectedContentWorkflow();
     $rssSourcesStmt = $pdo->prepare("SELECT COUNT(*) FROM rss_sources");
     $rssSourcesStmt->execute();
-    $globalRssSources = (int)$rssSourcesStmt->fetchColumn();
+    $rssSources = (int)$rssSourcesStmt->fetchColumn();
     $webSourcesStmt = $pdo->prepare("SELECT COUNT(*) FROM web_sources");
     $webSourcesStmt->execute();
-    $globalWebSources = (int)$webSourcesStmt->fetchColumn();
+    $webSources = (int)$webSourcesStmt->fetchColumn();
     $dailyLimit = getSettingInt('daily_limit', 5, 1, 200);
 
-    $selectedSources = $selected === 'web'
-        ? (count($nicheWebSources) > 0 ? count($nicheWebSources) : $globalWebSources)
-        : (count($nicheRssSources) > 0 ? count($nicheRssSources) : $globalRssSources);
+    $selectedSources = $selected === 'web' ? $webSources : $rssSources;
     $scheduler = getAutoPublishSchedulerMeta();
 
     $health = 'ready';
@@ -1156,13 +1121,10 @@ function getContentWorkflowSummary() {
     }
 
     return [
-        'active_niche' => $activeNiche,
         'selected_workflow' => $selected,
         'selected_workflow_label' => $selected === 'web' ? 'Normal Sites Workflow' : 'RSS Workflow',
-        'active_niche_rss_sources' => count($nicheRssSources),
-        'active_niche_web_sources' => count($nicheWebSources),
-        'global_rss_sources' => $globalRssSources,
-        'global_web_sources' => $globalWebSources,
+        'rss_sources' => $rssSources,
+        'web_sources' => $webSources,
         'selected_sources' => $selectedSources,
         'daily_limit' => $dailyLimit,
         'auto_ai_enabled' => getSettingInt('auto_ai_enabled', 1, 0, 1) === 1,
@@ -2678,7 +2640,19 @@ function exportStaticPages($language = null) {
             $html .= '<p>' . e($para) . '</p>\n';
         }
         $html .= '</main>\n</body>\n</html>\n';
+        // primary filename
         file_put_contents(__DIR__ . '/' . $key . '.html', $html);
+        // also write legacy variants
+        if ($key === 'about') {
+            file_put_contents(__DIR__ . '/about-us.html', $html);
+        }
+        if ($key === 'contact') {
+            file_put_contents(__DIR__ . '/contact-us.html', $html);
+        }
+        if ($key === 'privacy') {
+            // also correct common misspelling
+            file_put_contents(__DIR__ . '/privercy.html', $html);
+        }
     }
 }
 
