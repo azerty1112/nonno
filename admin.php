@@ -1,16 +1,6 @@
 <?php
+session_start();
 require_once 'functions.php';
-
-if (!function_exists('endsWith')) {
-    function endsWith($haystack, $needle) {
-        $haystack = (string)$haystack;
-        $needle = (string)$needle;
-        if ($needle === '') {
-            return true;
-        }
-        return substr($haystack, -strlen($needle)) === $needle;
-    }
-}
 
 $siteTitle = getSiteTitle();
 
@@ -882,7 +872,7 @@ if ($requestMethod === 'POST') {
             if ($type === 'auto') {
                 $path = strtolower((string)parse_url($u, PHP_URL_PATH));
                 $query = strtolower((string)parse_url($u, PHP_URL_QUERY));
-                $type = (strpos($path, 'feed') !== false || endsWith($path, '.xml') || endsWith($path, '.rss') || endsWith($path, '.atom') || strpos($query, 'feed=') !== false)
+                $type = (strpos($path, 'feed') !== false || str_ends_with($path, '.xml') || str_ends_with($path, '.rss') || str_ends_with($path, '.atom') || strpos($query, 'feed=') !== false)
                     ? 'rss' : 'web';
             }
             if ($type === 'rss') $detectedRss++; else $detectedWeb++;

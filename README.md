@@ -149,7 +149,7 @@ Submit this sitemap in both consoles:
 https://your-domain.com/sitemap.php
 ```
 
-To create static copies of the informational pages, run the included exporter script. It will write `about.html`, `contact.html`, `privacy.html`, `terms.html` (and legacy `about-us.html`/`contact-us.html`, `privercy.html`):
+To create static copies of the informational pages, run the included exporter script. It will write `about.html`, `contact.html`, `privacy.html`, `terms.html`:
 
 ```bash
 php scripts/export_static.php

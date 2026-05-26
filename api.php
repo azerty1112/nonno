@@ -49,13 +49,19 @@ if ($endpoint === 'stats') {
     $latestPublishStmt = $pdo->prepare("SELECT MAX(published_at) FROM articles");
     $latestPublishStmt->execute();
     $latestPublish = $latestPublishStmt->fetchColumn();
+    $activeNiche = getActiveNicheSlug();
+    $nicheRssCount = count(getNicheRssSources($activeNiche));
+    $nicheWebCount = count(getNicheWebSources($activeNiche));
     $workflowSummary = getContentWorkflowSummary();
 
     echo json_encode([
         'site' => getSiteTitle(),
+        'active_niche' => $activeNiche,
+        'active_niche_rss_sources' => $nicheRssCount,
+        'active_niche_web_sources' => $nicheWebCount,
+        'global_rss_sources' => $totalSources,
+        'global_web_sources' => $totalWebSources,
         'total_articles' => $totalArticles,
-        'total_rss_sources' => $totalSources,
-        'total_web_sources' => $totalWebSources,
         'selected_content_workflow' => getSelectedContentWorkflow(),
         'workflow_summary' => $workflowSummary,
         'latest_publish' => $latestPublish,

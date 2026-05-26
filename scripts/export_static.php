@@ -104,16 +104,6 @@ function exportStaticPages($language = null) {
         $html .= '</main>\n</body>\n</html>\n';
         $dest = __DIR__ . '/../' . $key . '.html';
         file_put_contents($dest, $html);
-        // also write legacy names
-        if ($key === 'about') {
-            file_put_contents(__DIR__ . '/../about-us.html', $html);
-        }
-        if ($key === 'contact') {
-            file_put_contents(__DIR__ . '/../contact-us.html', $html);
-        }
-        if ($key === 'privacy') {
-            file_put_contents(__DIR__ . '/../privercy.html', $html);
-        }
     }
 }
 

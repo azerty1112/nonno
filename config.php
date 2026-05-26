@@ -1,8 +1,7 @@
 <?php
-session_start();
 
 function normalizeConfigKey($key) {
-    return strtolower(str_replace(['-', ' '], ['_', '_'], trim((string)$key)));
+    return strtolower(str_replace(['-', ' '], '_', trim((string)$key)));
 }
 
 function parseConfigList($value, array $separators = [',']) {
@@ -240,20 +239,10 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS niche_sources (
 
 loadConfigFileIfChanged($pdo, __DIR__ . '/config.txt');
 
-// Default niches (ensure required niches exist on every install/update)
-$defaultNiches = [
-    ['general', 'General Automotive', 'General car news and reviews.'],
-    ['ev', 'Electric Vehicles', 'EV news, reviews and charging guides.'],
-    ['motorcycles', 'Motorcycles', 'Motorcycle news and reviews.'],
-    ['auto-mobile', 'Auto Mobile', 'Automotive mobile trends, cars and transport updates.'],
-    ['cuisine', 'Cuisine', 'Food, recipes, and restaurant-related content.'],
-    ['eran-money', 'Eran Money', 'Business, money and personal finance content.'],
-];
-$insertNicheStmt = $pdo->prepare("INSERT OR IGNORE INTO niches (slug, name, description) VALUES (?, ?, ?)");
-foreach ($defaultNiches as [$slug, $name, $description]) {
-    $insertNicheStmt->execute([$slug, $name, $description]);
+// Default niches are seeded by the NicheManager class if available.
+if (class_exists('App\\NicheManager')) {
+    \App\NicheManager::seedDefaults();
 }
-
 
 
 // Tags system for better SEO and filtering

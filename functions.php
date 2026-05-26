@@ -1050,8 +1050,20 @@ function runRssWorkflow($limit = null) {
 }
 
 function runWebWorkflow($limit = null) {
+    $pdo = db_connect();
     $activeNiche = getActiveNicheSlug();
-    $sources = getNicheWebSources($activeNiche) ?: [];
+    $nicheId = getActiveNicheId();
+
+    $stmt = $pdo->prepare("SELECT url FROM niche_sources WHERE niche_id = ? AND type = 'web' ORDER BY id DESC");
+    $stmt->execute([$nicheId]);
+    $sources = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+    if (empty($sources)) {
+        $stmt = $pdo->prepare("SELECT url FROM web_sources ORDER BY id DESC");
+        $stmt->execute();
+        $sources = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
     $limit = $limit === null ? max(1, (int)getSetting('daily_limit', 5)) : max(1, (int)$limit);
     $batchSize = getSettingInt('workflow_batch_size', 8, 1, 30);
 
@@ -1117,17 +1129,23 @@ function runSelectedContentWorkflow($limit = null) {
 }
 
 function getContentWorkflowSummary() {
-    $pdo = db_connect();
     $selected = getSelectedContentWorkflow();
+    $activeNiche = getActiveNicheSlug();
+    $nicheRssSources = getNicheRssSources($activeNiche);
+    $nicheWebSources = getNicheWebSources($activeNiche);
+
+    $pdo = db_connect();
     $rssSourcesStmt = $pdo->prepare("SELECT COUNT(*) FROM rss_sources");
     $rssSourcesStmt->execute();
-    $rssSources = (int)$rssSourcesStmt->fetchColumn();
+    $globalRssSources = (int)$rssSourcesStmt->fetchColumn();
     $webSourcesStmt = $pdo->prepare("SELECT COUNT(*) FROM web_sources");
     $webSourcesStmt->execute();
-    $webSources = (int)$webSourcesStmt->fetchColumn();
+    $globalWebSources = (int)$webSourcesStmt->fetchColumn();
     $dailyLimit = getSettingInt('daily_limit', 5, 1, 200);
 
-    $selectedSources = $selected === 'web' ? $webSources : $rssSources;
+    $selectedSources = $selected === 'web'
+        ? (count($nicheWebSources) > 0 ? count($nicheWebSources) : $globalWebSources)
+        : (count($nicheRssSources) > 0 ? count($nicheRssSources) : $globalRssSources);
     $scheduler = getAutoPublishSchedulerMeta();
 
     $health = 'ready';
@@ -1138,10 +1156,13 @@ function getContentWorkflowSummary() {
     }
 
     return [
+        'active_niche' => $activeNiche,
         'selected_workflow' => $selected,
         'selected_workflow_label' => $selected === 'web' ? 'Normal Sites Workflow' : 'RSS Workflow',
-        'rss_sources' => $rssSources,
-        'web_sources' => $webSources,
+        'active_niche_rss_sources' => count($nicheRssSources),
+        'active_niche_web_sources' => count($nicheWebSources),
+        'global_rss_sources' => $globalRssSources,
+        'global_web_sources' => $globalWebSources,
         'selected_sources' => $selectedSources,
         'daily_limit' => $dailyLimit,
         'auto_ai_enabled' => getSettingInt('auto_ai_enabled', 1, 0, 1) === 1,
@@ -2657,19 +2678,7 @@ function exportStaticPages($language = null) {
             $html .= '<p>' . e($para) . '</p>\n';
         }
         $html .= '</main>\n</body>\n</html>\n';
-        // primary filename
         file_put_contents(__DIR__ . '/' . $key . '.html', $html);
-        // also write legacy variants
-        if ($key === 'about') {
-            file_put_contents(__DIR__ . '/about-us.html', $html);
-        }
-        if ($key === 'contact') {
-            file_put_contents(__DIR__ . '/contact-us.html', $html);
-        }
-        if ($key === 'privacy') {
-            // also correct common misspelling
-            file_put_contents(__DIR__ . '/privercy.html', $html);
-        }
     }
 }
 

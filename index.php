@@ -28,13 +28,6 @@ $breadcrumbStructuredData = null;
 $listingStructuredData = null;
 $staticPages = getStaticPages($language);
 
-if ($staticPage === '') {
-    $legacyStaticPage = trim((string)($_GET['page'] ?? ''));
-    if ($legacyStaticPage !== '' && !ctype_digit($legacyStaticPage) && isset($staticPages[$legacyStaticPage])) {
-        $staticPage = $legacyStaticPage;
-    }
-}
-
 if (!isset($staticPages[$staticPage])) {
     $staticPage = '';
 }
