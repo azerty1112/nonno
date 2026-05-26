@@ -1141,7 +1141,7 @@ $baseQuery['per_page'] = $perPage;
     <?php
     // Show trending articles on homepage
     if ($slug === '' && $search === '' && $category === '' && $page === 1) {
-        $trending = getTrendingArticles(6);
+        $trending = getTrendingArticles(6, $activeNiche);
         if (!empty($trending)): ?>
             <section class="mb-4 p-4 rounded-4 bg-info bg-opacity-10 border border-info border-opacity-25">
                 <h2 class="h5 mb-3"><i class="bi bi-fire"></i> Trending Now</h2>
@@ -1257,9 +1257,41 @@ $baseQuery['per_page'] = $perPage;
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     $articles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $nicheFallbackNotice = '';
+    $useGlobalFallback = false;
+    if (empty($articles)
+        && $slug === ''
+        && $search === ''
+        && $category === ''
+        && $publishedFrom === ''
+        && $publishedTo === ''
+        && $tagFilter === ''
+        && $page === 1
+        && $activeNiche > 1
+    ) {
+        $fallbackSql = "SELECT id, title, slug, excerpt, image, image2, translated_title, category, published_at, MAX(1, CAST(ROUND(((LENGTH(content) - LENGTH(REPLACE(content, ' ', '')) + 1) / 200.0)) AS INTEGER)) AS reading_minutes FROM articles ORDER BY $orderBy LIMIT :limit OFFSET :offset";
+        $fallbackStmt = $pdo->prepare($fallbackSql);
+        $fallbackStmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $fallbackStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $fallbackStmt->execute();
+        $articles = $fallbackStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($articles)) {
+            $nicheFallbackNotice = 'No articles were found for the current niche. Displaying all available articles instead.';
+            $useGlobalFallback = true;
+            $countStmt = $pdo->prepare("SELECT COUNT(*) FROM articles");
+            $countStmt->execute();
+            $total = (int)$countStmt->fetchColumn();
+            $totalPages = max(1, (int)ceil($total / $perPage));
+            $page = min($page, $totalPages);
+        }
+    }
 
     $featured = null;
     if ($page === 1) {
+        if ($useGlobalFallback) {
+            $where = '';
+        }
         $featureStmt = $pdo->prepare("SELECT title, slug, excerpt FROM articles $where ORDER BY id DESC LIMIT 1");
         if ($search !== '') {
             $featureStmt->bindValue(':search', '%' . $search . '%', PDO::PARAM_STR);
@@ -1302,6 +1334,10 @@ $baseQuery['per_page'] = $perPage;
         <section class="mb-4" aria-label="Listing sponsored placement">
             <?= $globalAdUnitHtml ?>
         </section>
+    <?php endif; ?>
+
+    <?php if ($nicheFallbackNotice !== ''): ?>
+        <div class="alert alert-warning mb-4"><?= e($nicheFallbackNotice) ?></div>
     <?php endif; ?>
 
     <?php if ($featured): ?>

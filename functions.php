@@ -322,18 +322,35 @@ function getArticleStats($articleId) {
     ];
 }
 
-function getTrendingArticles($limit = 10) {
+function getTrendingArticles($limit = 10, $nicheId = null) {
     $pdo = db_connect();
+    $whereClause = '';
+    $params = [];
+    if ($nicheId !== null) {
+        if ($nicheId === 1) {
+            $whereClause = 'WHERE (a.niche_id = :niche_id OR a.niche_id IS NULL)';
+        } else {
+            $whereClause = 'WHERE a.niche_id = :niche_id';
+        }
+        $params['niche_id'] = $nicheId;
+    }
+
     $stmt = $pdo->prepare("
         SELECT a.id, a.title, a.slug, a.excerpt, a.image, a.published_at,
                a.image2, a.translated_title,
                s.views, s.avg_rating, s.rating_count
         FROM articles a
         LEFT JOIN article_stats s ON a.id = s.article_id
+        $whereClause
         ORDER BY COALESCE(s.views, 0) DESC
-        LIMIT ?
+        LIMIT :limit
     ");
-    $stmt->execute([(int)$limit]);
+
+    if ($nicheId !== null) {
+        $stmt->bindValue(':niche_id', (int)$nicheId, PDO::PARAM_INT);
+    }
+    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
