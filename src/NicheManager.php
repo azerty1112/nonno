@@ -202,55 +202,6 @@ class NicheManager
                     'https://www.autoblog.com/news/',
                     'https://www.caranddriver.com/news/'
                 ]
-            ],
-            'ev' => [
-                'name' => 'Electric Vehicles',
-                'description' => 'EV news, reviews and charging guides.',
-                'rss' => [
-                    'https://insideevs.com/rss',
-                    'https://electrek.co/feed/',
-                    'https://www.greencarreports.com/rss'
-                ],
-                'web' => [
-                    'https://insideevs.com/news/',
-                    'https://electrek.co/'
-                ]
-            ],
-            'motorcycles' => [
-                'name' => 'Motorcycles',
-                'description' => 'Motorcycle news and reviews.',
-                'rss' => [
-                    'https://www.motorcyclenews.com/rss/',
-                    'https://www.visordown.com/rss.xml'
-                ],
-                'web' => [
-                    'https://www.motorcyclenews.com/news/',
-                    'https://www.rideapart.com/news/'
-                ]
-            ],
-            'cuisine' => [
-                'name' => 'Cuisine',
-                'description' => 'Food, recipes, and restaurant-related content.',
-                'rss' => [
-                    'https://www.seriouseats.com/rss',
-                    'https://www.bonappetit.com/feed/rss'
-                ],
-                'web' => [
-                    'https://www.seriouseats.com/',
-                    'https://www.bonappetit.com/'
-                ]
-            ],
-            'eran-money' => [
-                'name' => 'Eran Money',
-                'description' => 'Business, money and personal finance content.',
-                'rss' => [
-                    'https://www.investopedia.com/feedbuilder/feed/getfeed?feedName=rss_articles',
-                    'https://www.nerdwallet.com/blog/feed/'
-                ],
-                'web' => [
-                    'https://www.investopedia.com/',
-                    'https://www.nerdwallet.com/'
-                ]
             ]
         ];
 

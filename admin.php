@@ -714,97 +714,12 @@ if ($requestMethod === 'POST') {
         exit;
     }
 
-    if (isset($_POST['fill_smart_sources_10_per_niche'])) {
-        $nichesForFillStmt = $pdo->prepare("SELECT slug, name FROM niches ORDER BY id");
-        $nichesForFillStmt->execute();
-        $nichesForFill = $nichesForFillStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $presetUrls = [];
-        foreach ($nichesForFill as $n) {
-            $slug = trim((string)($n['slug'] ?? 'general'));
-            if ($slug === '') $slug = 'general';
-            $safe = preg_replace('/[^a-z0-9\-]/i', '-', strtolower($slug));
-            for ($i = 1; $i <= 10; $i++) {
-                $presetUrls[] = "https://{$safe}.news-source{$i}.example/feed.xml";
-            }
-        }
-        setSetting('smart_source_prefill_bulk', implode("\n", $presetUrls));
-        $_SESSION['flash_message'] = 'تم تجهيز قائمة كبيرة: 10 روابط RSS لكل نيش. يمكنك تعديلها ثم حفظها.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php#auto-scheduler-section');
-        exit;
-    }
-
-    if (isset($_POST['fill_all_smart_hub_fields'])) {
-        $nichesForFillStmt = $pdo->prepare("SELECT slug, name FROM niches ORDER BY id");
-        $nichesForFillStmt->execute();
-        $nichesForFill = $nichesForFillStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $firstSlug = (string)($nichesForFill[0]['slug'] ?? 'general');
-        if ($firstSlug === '') $firstSlug = 'general';
-        setSetting('active_niche', $firstSlug);
-        setSetting('auto_title_mode', 'template');
-        setSetting('auto_publish_interval_seconds_from', '1800');
-        setSetting('auto_publish_interval_seconds_to', '7200');
-        setSetting('auto_ai_enabled', '1');
-        setSetting('smart_source_prefill_url', 'https://news.google.com/rss/search?q=' . rawurlencode($firstSlug));
-        setSetting('smart_source_prefill_type', 'rss');
-        setSetting('smart_source_prefill_niche', $firstSlug);
-        setSetting('smart_source_prefill_selected_niches', $firstSlug);
-
-        $defaultTitleFields = getAutoTitleDefaultSettings();
-        foreach (['auto_title_brands', 'auto_title_models', 'auto_title_modifiers', 'auto_title_audiences', 'auto_title_angles', 'auto_title_templates', 'auto_title_fixed_titles'] as $fieldKey) {
-            setSetting('niche.' . $firstSlug . '.' . $fieldKey, (string)($defaultTitleFields[$fieldKey] ?? ''));
-        }
-
-        setSetting('niche.' . $firstSlug . '.auto_title_mode', 'template');
-        setSetting('niche.' . $firstSlug . '.auto_title_min_year_offset', '0');
-        setSetting('niche.' . $firstSlug . '.auto_title_max_year_offset', '1');
-
-        $presetUrls = [];
-        foreach ($nichesForFill as $n) {
-            $slug = trim((string)($n['slug'] ?? 'general'));
-            if ($slug === '') $slug = 'general';
-            $safe = preg_replace('/[^a-z0-9\-]/i', '-', strtolower($slug));
-            for ($i = 1; $i <= 10; $i++) {
-                $presetUrls[] = "https://{$safe}.news-source{$i}.example/feed.xml";
-            }
-        }
-        setSetting('smart_source_prefill_bulk', implode("\n", $presetUrls));
-        $_SESSION['flash_message'] = 'تم ملء كل الخانات تلقائياً مع 10 RSS لكل نيش.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php#auto-scheduler-section');
-        exit;
-    }
-
-    if (isset($_POST['fill_closed_fields_all_niches'])) {
-        $nichesForFillStmt = $pdo->prepare("SELECT slug FROM niches ORDER BY id");
-        $nichesForFillStmt->execute();
-        $nichesForFill = $nichesForFillStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $allSlugs = [];
-        foreach ($nichesForFill as $n) {
-            $slug = trim((string)($n['slug'] ?? ''));
-            if ($slug !== '') {
-                $allSlugs[] = $slug;
-            }
-        }
-        $allSlugs = array_values(array_unique($allSlugs));
-        $firstSlug = (string)($allSlugs[0] ?? 'general');
-        setSetting('smart_source_prefill_selected_niches', implode(',', $allSlugs));
-        setSetting('smart_source_prefill_niche', $firstSlug);
-        setSetting('active_niche', $firstSlug);
-        $_SESSION['flash_message'] = 'تم تعبئة الخانات المغلقة بكل النيشات المتاحة.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php#auto-scheduler-section');
-        exit;
-    }
 
     if (isset($_POST['add_source_smart'])) {
         $smartUrl = trim((string)($_POST['smart_source_url'] ?? ''));
         $smartUrlsBulk = trim((string)($_POST['smart_source_urls'] ?? ''));
-        $smartNicheSlug = trim((string)($_POST['smart_target_niche_slug'] ?? ''));
-        if ($smartNicheSlug === '') {
-            $smartNicheSlug = trim((string)getSetting('active_niche', ''));
-        }
         $smartType = trim((string)($_POST['smart_source_type'] ?? 'auto'));
+        $smartNicheSlug = trim((string)getSetting('active_niche', 'general'));
 
         $normalizeSmartUrl = static function ($url) {
             $url = trim((string)$url);
@@ -940,10 +855,10 @@ if ($requestMethod === 'POST') {
             exit;
         }
 
-        $targetNicheSlug = trim((string)($_POST['rss_target_niche_slug'] ?? ''));
         $targetNicheId = 0;
-        if ($targetNicheSlug !== '' && class_exists('App\\NicheManager')) {
-            $targetNiche = \App\NicheManager::getNicheBySlug($targetNicheSlug);
+        if (class_exists('App\\NicheManager')) {
+            $activeNicheSlug = trim((string)getSetting('active_niche', 'general'));
+            $targetNiche = \App\NicheManager::getNicheBySlug($activeNicheSlug);
             if ($targetNiche) {
                 $targetNicheId = (int)($targetNiche['id'] ?? 0);
             }
@@ -1030,10 +945,10 @@ if ($requestMethod === 'POST') {
             exit;
         }
 
-        $targetNicheSlug = trim((string)($_POST['web_target_niche_slug'] ?? ''));
         $targetNicheId = 0;
-        if ($targetNicheSlug !== '' && class_exists('App\\NicheManager')) {
-            $targetNiche = \App\NicheManager::getNicheBySlug($targetNicheSlug);
+        if (class_exists('App\\NicheManager')) {
+            $activeNicheSlug = trim((string)getSetting('active_niche', 'general'));
+            $targetNiche = \App\NicheManager::getNicheBySlug($activeNicheSlug);
             if ($targetNiche) {
                 $targetNicheId = (int)($targetNiche['id'] ?? 0);
             }
@@ -1544,231 +1459,6 @@ if ($webSearch !== '') {
     $webParams['url'] = '%' . $webSearch . '%';
 }
 $webSql .= " ORDER BY id DESC";
-// Niche management POST handlers
-
-    if (isset($_POST['publish_multi_niches'])) {
-        $selectedNiches = $_POST['multi_niches'] ?? [];
-        $count = 0;
-        foreach ($selectedNiches as $nicheSlug) {
-            $nicheSlug = trim((string)$nicheSlug);
-            if ($nicheSlug === '') {
-                continue;
-            }
-            setSetting('active_niche', $nicheSlug);
-            $result = publishAutoArticleBySchedule(true);
-            if (($result['published'] ?? 0) === 1) {
-                $count++;
-            }
-        }
-        $_SESSION['flash_message'] = "تم النشر في {$count} نيش.";
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php');
-        exit;
-    }
-
-    if (isset($_POST['create_niche'])) {
-        $rawSlug = trim((string)($_POST['niche_slug'] ?? ''));
-        $name = trim((string)($_POST['niche_name'] ?? ''));
-        $description = trim((string)($_POST['niche_description'] ?? ''));
-        if ($name === '') {
-            $_SESSION['flash_message'] = 'Niche name is required.';
-            $_SESSION['flash_type'] = 'danger';
-            header('Location: admin.php');
-            exit;
-        }
-        $slug = $rawSlug !== '' ? slugify($rawSlug) : slugify($name);
-        $id = \App\NicheManager::createNiche($slug, $name, $description);
-        if ($id > 0) {
-            $_SESSION['flash_message'] = 'Niche created successfully.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_message'] = 'Failed to create niche.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-        header('Location: admin.php');
-        exit;
-    }
-
-    if (isset($_POST['delete_niche'])) {
-        $nicheId = (int)($_POST['niche_id'] ?? 0);
-        if ($nicheId > 0 && \App\NicheManager::deleteNiche($nicheId)) {
-            $_SESSION['flash_message'] = 'Niche deleted.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_message'] = 'Invalid niche selected or delete failed.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-        header('Location: admin.php');
-        exit;
-    }
-
-    if (isset($_POST['update_niche'])) {
-        $nicheId = (int)($_POST['niche_id'] ?? 0);
-        $name = trim((string)($_POST['niche_name'] ?? ''));
-        $description = trim((string)($_POST['niche_description'] ?? ''));
-        if ($nicheId > 0 && $name !== '' && \App\NicheManager::updateNiche($nicheId, $name, $description)) {
-            $_SESSION['flash_message'] = 'Niche updated successfully.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_message'] = 'Invalid niche data or update failed.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-        header('Location: admin.php#niche-management');
-        exit;
-    }
-
-    if (isset($_POST['add_niche_source'])) {
-        $nicheId = (int)($_POST['niche_id'] ?? 0);
-        $type = trim((string)($_POST['source_type'] ?? 'rss')) === 'web' ? 'web' : 'rss';
-        $url = trim((string)($_POST['source_url'] ?? ''));
-        if ($nicheId > 0 && $url !== '' && filter_var($url, FILTER_VALIDATE_URL) && \App\NicheManager::addSource($nicheId, $type, $url)) {
-            $_SESSION['flash_message'] = 'Source added.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_message'] = 'Invalid niche or URL.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-        header('Location: admin.php');
-        exit;
-    }
-
-
-    if (isset($_POST['replace_niche_sources'])) {
-        $nicheId = (int)($_POST['niche_id'] ?? 0);
-        $type = trim((string)($_POST['source_type'] ?? 'rss')) === 'web' ? 'web' : 'rss';
-        $bulkInput = trim((string)($_POST['source_urls_bulk'] ?? ''));
-
-        if ($nicheId <= 0) {
-            $_SESSION['flash_message'] = 'Invalid niche selected.';
-            $_SESSION['flash_type'] = 'danger';
-            header('Location: admin.php#niche-management');
-            exit;
-        }
-
-        $rows = $bulkInput === '' ? [] : (preg_split('/\r\n|\r|\n/', $bulkInput) ?: []);
-        $uniqueUrls = [];
-        foreach ($rows as $row) {
-            $url = trim((string)$row);
-            if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
-                continue;
-            }
-            $uniqueUrls[$url] = true;
-        }
-
-        if ($bulkInput !== '' && empty($uniqueUrls)) {
-            $_SESSION['flash_message'] = 'No valid URLs were provided. Please enter at least one valid URL or leave the field empty to clear sources.';
-            $_SESSION['flash_type'] = 'danger';
-            header('Location: admin.php#niche-management');
-            exit;
-        }
-
-        if (\App\NicheManager::replaceSources($nicheId, $type, array_keys($uniqueUrls))) {
-            $_SESSION['flash_message'] = strtoupper($type) . " sources replaced successfully (" . count($uniqueUrls) . " source(s)).";
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_message'] = 'Could not replace niche sources. Please try again.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-
-        header('Location: admin.php#niche-management');
-        exit;
-    }
-
-    if (isset($_POST['remove_niche_source'])) {
-        $nicheId = (int)($_POST['niche_id'] ?? 0);
-        $type = trim((string)($_POST['source_type'] ?? '')) === 'web' ? 'web' : 'rss';
-        $url = trim((string)($_POST['source_url'] ?? ''));
-        if ($nicheId > 0 && $url !== '' && \App\NicheManager::removeSource($nicheId, $type, $url)) {
-            $_SESSION['flash_message'] = 'Source removed.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_message'] = 'Invalid source selected or remove failed.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-        header('Location: admin.php');
-        exit;
-    }
-
-    if (isset($_POST['manage_niche_auto_title'])) {
-        $nicheSlug = trim((string)($_POST['niche_auto_title'] ?? ''));
-        if ($nicheSlug !== '') {
-            setSetting('active_niche', $nicheSlug);
-            $_SESSION['flash_message'] = "Auto-title editor switched to niche: {$nicheSlug}";
-            $_SESSION['flash_type'] = 'info';
-        } else {
-            $_SESSION['flash_message'] = 'Please select a niche first.';
-            $_SESSION['flash_type'] = 'warning';
-        }
-        header('Location: admin.php#auto-scheduler-section');
-        exit;
-    }
-
-    if (isset($_POST['save_niche_title_pack'])) {
-        $nicheSlug = trim((string)($_POST['niche_title_slug'] ?? ''));
-        if ($nicheSlug === '') {
-            $_SESSION['flash_message'] = 'Invalid niche for title pack update.';
-            $_SESSION['flash_type'] = 'danger';
-            header('Location: admin.php#niche-management');
-            exit;
-        }
-
-        $mode = trim((string)($_POST['niche_auto_title_mode'] ?? 'template'));
-        if (!in_array($mode, ['template', 'list'], true)) {
-            $mode = 'template';
-        }
-
-        $fields = [
-            'auto_title_fixed_titles' => (string)($_POST['niche_fixed_titles'] ?? ''),
-            'auto_title_brands' => (string)($_POST['niche_brands'] ?? ''),
-            'auto_title_models' => (string)($_POST['niche_models'] ?? ''),
-            'auto_title_modifiers' => (string)($_POST['niche_modifiers'] ?? ''),
-            'auto_title_audiences' => (string)($_POST['niche_audiences'] ?? ''),
-            'auto_title_angles' => (string)($_POST['niche_angles'] ?? ''),
-            'auto_title_templates' => (string)($_POST['niche_templates'] ?? ''),
-        ];
-
-        $prefix = 'niche.' . $nicheSlug . '.';
-        setSetting($prefix . 'auto_title_mode', $mode);
-
-        foreach ($fields as $fieldKey => $raw) {
-            $lines = preg_split('/\r\n|\r|\n/', trim($raw)) ?: [];
-            $clean = [];
-            foreach ($lines as $line) {
-                $line = trim((string)$line);
-                if ($line !== '') {
-                    $clean[] = $line;
-                }
-            }
-            $clean = array_values(array_unique($clean));
-            setSetting($prefix . $fieldKey, implode("\n", $clean));
-        }
-
-        $_SESSION['flash_message'] = 'Niche title pack updated successfully.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php#niche-management');
-        exit;
-    }
-
-    if (isset($_POST['set_active_niche'])) {
-        $slug = trim((string)($_POST['active_niche'] ?? ''));
-        if ($slug !== '' && class_exists('App\\NicheManager')) {
-            $niche = \App\NicheManager::getNicheBySlug($slug);
-            if ($niche) {
-                setSetting('active_niche', $slug);
-                $_SESSION['flash_message'] = 'Active niche updated.';
-                $_SESSION['flash_type'] = 'success';
-            } else {
-                $_SESSION['flash_message'] = 'Invalid niche selected.';
-                $_SESSION['flash_type'] = 'danger';
-            }
-        } else {
-            $_SESSION['flash_message'] = 'Invalid niche selected.';
-            $_SESSION['flash_type'] = 'danger';
-        }
-        header('Location: admin.php');
-        exit;
-    }
-
     if (isset($_POST['refresh_config_file'])) {
         $beforeFingerprint = getSetting('config_txt_fingerprint', '');
         $configFileResult = loadConfigFileIfChanged($pdo, __DIR__ . '/config.txt');
@@ -2553,8 +2243,8 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                     $nichesListStmt->execute();
                     $nichesList = $nichesListStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                     ?>
-                    <h5 class="text-danger"><i class="bi bi-robot"></i> Smart Niche Automation Hub <span class="badge text-bg-dark ms-2">Pro</span></h5>
-                    <p class="text-secondary mb-3">دمج ذكي بين <strong>AI Auto Publish Scheduler</strong> و <strong>Niche Management</strong> و <strong>Auto Title Generator Controls</strong> و <strong>Source Intake</strong> في لوحة واحدة لإدارة أسرع وأوضح.</p>
+                    <h5 class="text-danger"><i class="bi bi-robot"></i> Smart Automation Hub</h5>
+                    <p class="text-secondary mb-3">دمج ذكي بين <strong>AI Auto Publish Scheduler</strong> و <strong>Auto Title Generator Controls</strong> و <strong>Source Intake</strong> في لوحة واحدة لإدارة أسرع وأوضح.</p>
                     <div class="smart-toolbar">
                         <span class="smart-pill"><i class="bi bi-diagram-3"></i> Niches: <?= count($nichesList) ?></span>
                         <span class="smart-pill"><i class="bi bi-tags"></i> Active: <?= e((string)getSetting('active_niche', 'general')) ?></span>
@@ -2566,11 +2256,8 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <div class="col-md-4">
                             <label class="form-label">Active Niche</label>
-                            <select name="smart_active_niche" class="form-select">
-                                <?php foreach ($nichesList as $n): ?>
-                                    <option value="<?= e($n['slug']) ?>" <?= e((string)getSetting('active_niche', 'general')) === $n['slug'] ? 'selected' : '' ?>><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
-                                <?php endforeach; ?>
-                            </select>
+                            <div class="form-control bg-dark text-white">General Automotive (general)</div>
+                            <input type="hidden" name="smart_active_niche" value="general">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Auto Title Mode</label>
@@ -2618,219 +2305,9 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
 
 
                     <hr class="border-secondary-subtle my-3">
-                    <h6><span class="badge text-bg-secondary me-2">1</span><i class="bi bi-kanban-fill"></i> Niche Management (Integrated)</h6>
-
-                    <form method="post" class="row g-2 mb-3">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <div class="col-12">
-                            <label class="form-label">نشر محتوى لأكثر من نيش</label>
-                            <?php $prefilledSelectedNiches = array_values(array_filter(array_map('trim', explode(',', (string)getSetting('smart_source_prefill_selected_niches', ''))))); ?>
-                            <select name="multi_niches[]" class="form-select" multiple>
-                                <?php foreach ($nichesList as $n): ?>
-                                    <option value="<?= e($n['slug']) ?>" <?= in_array($n['slug'], $prefilledSelectedNiches, true) ? 'selected' : '' ?>><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-12 mt-2">
-                            <button name="publish_multi_niches" value="1" class="btn btn-success">نشر في جميع النيشات المختارة</button>
-                        </div>
-                    </form>
-
-                    
-
-                    <form method="post" class="row g-2 mb-3">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                        <div class="col-12">
-                            <label class="form-label">Create New Niche</label>
-                        </div>
-                        <div class="col-4">
-                            <input type="text" name="niche_slug" class="form-control" placeholder="slug (optional)">
-                        </div>
-                        <div class="col-4">
-                            <input type="text" name="niche_name" class="form-control" placeholder="Display name" required>
-                        </div>
-                        <div class="col-4">
-                            <input type="text" name="niche_description" class="form-control" placeholder="Short description">
-                        </div>
-                        <div class="col-12">
-                            <button name="create_niche" value="1" class="btn btn-outline-light">Create Niche</button>
-                        </div>
-                    </form>
-
                     <div class="alert alert-info mb-3">
-                        <strong>ملاحظة:</strong> استخدم اختيار النيش في أعلى قسم <strong>Smart Niche Automation Hub Pro</strong> كنقطة تحكم واحدة للنيش النشط. سيُستخدم هذا النيش في إضافة المصادر والكتاب الآلي والعناوين.
+                        تم حذف دعم إنشاء وإدارة النيشات المتعدد. النظام يعمل الآن باستخدام النيش العام فقط لتحسين البساطة.
                     </div>
-
-                    <div class="list-group mb-3">
-                        <?php foreach ($nichesList as $n): ?>
-                            <div class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <strong><?= e($n['name']) ?></strong>
-                                        <div class="small text-secondary"><?= e($n['slug']) ?> — <?= e($n['description']) ?></div>
-                                    </div>
-                                    <div class="text-end">
-                                        <button class="btn btn-sm btn-outline-secondary me-1 niche-details-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#niche-details-<?= (int)$n['id'] ?>" aria-expanded="false" aria-controls="niche-details-<?= (int)$n['id'] ?>">Show Fields</button>
-                                        <form method="post" onsubmit="return confirm('Delete this niche?');" class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                            <button name="delete_niche" class="btn btn-sm btn-danger">Delete</button>
-                                        </form>
-                                    </div>
-                                </div>
-
-                                <?php
-                                    $sourceGroups = \App\NicheManager::getNicheSources((int)$n['id']);
-                                ?>
-                                <div class="collapse mt-2" id="niche-details-<?= (int)$n['id'] ?>">
-                                <div class="row g-2">
-                                    <div class="col-12 mb-3">
-                                        <form method="post" class="row g-2 align-items-end">
-                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                            <div class="col-sm-4">
-                                                <label class="form-label">Niche Name</label>
-                                                <input type="text" name="niche_name" class="form-control" value="<?= e($n['name']) ?>" required>
-                                            </div>
-                                            <div class="col-sm-6">
-                                                <label class="form-label">Description</label>
-                                                <input type="text" name="niche_description" class="form-control" value="<?= e($n['description']) ?>">
-                                            </div>
-                                            <div class="col-sm-2">
-                                                <button name="update_niche" class="btn btn-sm btn-outline-primary w-100">Update</button>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <div class="col-12">
-                                        <div class="small mb-2 text-secondary">Sources:</div>
-                                        <?php if (empty($sourceGroups['rss']) && empty($sourceGroups['web'])): ?>
-                                            <em class="text-secondary">No sources configured.</em>
-                                        <?php else: ?>
-                                            <?php if (!empty($sourceGroups['rss'])): ?>
-                                                <div class="mb-2">
-                                                    <strong>RSS Sources</strong>
-                                                    <?php foreach ($sourceGroups['rss'] as $url): ?>
-                                                        <div class="d-flex justify-content-between align-items-center py-1">
-                                                            <div><strong>[rss]</strong> <?= e($url) ?></div>
-                                                            <form method="post" class="ms-2">
-                                                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                                                <input type="hidden" name="source_url" value="<?= e($url) ?>">
-                                                                <input type="hidden" name="source_type" value="rss">
-                                                                <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                                                <button name="remove_niche_source" class="btn btn-sm btn-outline-light">Remove</button>
-                                                            </form>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            <?php endif; ?>
-                                            <?php if (!empty($sourceGroups['web'])): ?>
-                                                <div class="mb-2">
-                                                    <strong>Web Sources</strong>
-                                                    <?php foreach ($sourceGroups['web'] as $url): ?>
-                                                        <div class="d-flex justify-content-between align-items-center py-1">
-                                                            <div><strong>[web]</strong> <?= e($url) ?></div>
-                                                            <form method="post" class="ms-2">
-                                                                <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                                                <input type="hidden" name="source_url" value="<?= e($url) ?>">
-                                                                <input type="hidden" name="source_type" value="web">
-                                                                <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                                                <button name="remove_niche_source" class="btn btn-sm btn-outline-light">Remove</button>
-                                                            </form>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
-                                    </div>
-
-                                    <div class="col-12">
-                                        <form method="post" class="row g-2">
-                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                            <div class="col-12 col-md-3">
-                                                <label class="form-label">Source Type</label>
-                                                <select name="source_type" class="form-select">
-                                                    <option value="rss">RSS</option>
-                                                    <option value="web">Web</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-12 col-md-6">
-                                                <label class="form-label">Source URL</label>
-                                                <input type="url" name="source_url" class="form-control" placeholder="https://example.com/feed.xml" required>
-                                            </div>
-                                            <div class="col-12 col-md-3 d-grid">
-                                                <button name="add_niche_source" class="btn btn-outline-light">Save Source</button>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <div class="col-12">
-                                        <form method="post" class="row g-2">
-                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                            <input type="hidden" name="niche_id" value="<?= (int)$n['id'] ?>">
-                                            <div class="col-md-3">
-                                                <label class="form-label">Replace Type</label>
-                                                <select name="source_type" class="form-select">
-                                                    <option value="rss">Replace RSS List</option>
-                                                    <option value="web">Replace Web List</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-7">
-                                                <label class="form-label">Source URLs</label>
-                                                <textarea name="source_urls_bulk" class="form-control" rows="3" placeholder="Paste one URL per line"></textarea>
-                                            </div>
-                                            <div class="col-md-2 d-grid">
-                                                <button name="replace_niche_sources" class="btn btn-outline-warning w-100" onclick="return confirm('This will replace all existing sources of this type for this niche. Continue?');">Replace</button>
-                                            </div>
-                                            <div class="col-12">
-                                                <small class="text-secondary">لكل نيش قائمة مستقلة بالكامل للمصادر. يمكنك لصق قائمة روابط كاملة وسيتم استبدالها دفعة واحدة.</small>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                                </div>
-                                <form method="post" class="row g-2 mt-3 border-top pt-2">
-                                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                                    <input type="hidden" name="niche_title_slug" value="<?= e($n['slug']) ?>">
-                                    <?php
-                                        $nichePrefix = 'niche.' . $n['slug'] . '.';
-                                        $nicheModeValue = (string)getSetting($nichePrefix . 'auto_title_mode', 'template');
-                                        $nicheFixedTitlesValue = (string)getSetting($nichePrefix . 'auto_title_fixed_titles', '');
-                                        $nicheBrandsValue = (string)getSetting($nichePrefix . 'auto_title_brands', '');
-                                        $nicheModelsValue = (string)getSetting($nichePrefix . 'auto_title_models', '');
-                                        $nicheModifiersValue = (string)getSetting($nichePrefix . 'auto_title_modifiers', '');
-                                        $nicheAudiencesValue = (string)getSetting($nichePrefix . 'auto_title_audiences', '');
-                                        $nicheAnglesValue = (string)getSetting($nichePrefix . 'auto_title_angles', '');
-                                        $nicheTemplatesValue = (string)getSetting($nichePrefix . 'auto_title_templates', '');
-                                    ?>
-                                    <div class="col-md-2">
-                                        <select name="niche_auto_title_mode" class="form-select">
-                                            <option value="template" <?= $nicheModeValue === 'template' ? 'selected' : '' ?>>Template</option>
-                                            <option value="list" <?= $nicheModeValue === 'list' ? 'selected' : '' ?>>Fixed List</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-5">
-                                        <textarea name="niche_fixed_titles" class="form-control" rows="2" placeholder="Paste niche titles (one per line)"><?= e($nicheFixedTitlesValue) ?></textarea>
-                                    </div>
-                                    <div class="col-md-5">
-                                        <textarea name="niche_brands" class="form-control" rows="2" placeholder="Paste niche keywords/brands (one per line)"><?= e($nicheBrandsValue) ?></textarea>
-                                    </div>
-                                    <div class="col-md-6"><textarea name="niche_models" class="form-control" rows="2" placeholder="Models / topics list"><?= e($nicheModelsValue) ?></textarea></div>
-                                    <div class="col-md-6"><textarea name="niche_modifiers" class="form-control" rows="2" placeholder="Modifiers e.g. guide, review"><?= e($nicheModifiersValue) ?></textarea></div>
-                                    <div class="col-md-6"><textarea name="niche_audiences" class="form-control" rows="2" placeholder="Audience list"><?= e($nicheAudiencesValue) ?></textarea></div>
-                                    <div class="col-md-6"><textarea name="niche_angles" class="form-control" rows="2" placeholder="Angles list"><?= e($nicheAnglesValue) ?></textarea></div>
-                                    <div class="col-12"><textarea name="niche_templates" class="form-control" rows="2" placeholder="Title templates with {year} {brand} {model} {modifier} {angle} {audience}"><?= e($nicheTemplatesValue) ?></textarea></div>
-                                    <div class="col-12">
-                                        <button name="save_niche_title_pack" value="1" class="btn btn-outline-info w-100">Save Niche Title/Keywords Pack</button>
-                                    </div>
-                                </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <small class="text-secondary">Use niches to segment sources and generate content for different verticals (e.g., EVs, Motorcycles, Home Appliances).</small>
                 </div>
             </div>
 
@@ -2928,7 +2405,7 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                     <small class="text-secondary">Includes the main configuration values from <code>config.php</code> so you can manage them from one place.</small>
                 
                     <hr class="border-secondary-subtle my-3">
-                    <h6><span class="badge text-bg-secondary me-2">2</span><i class="bi bi-columns-gap"></i> Unified Source Intake (RSS + Web) linked to Niche</h6>
+                    <h6><span class="badge text-bg-secondary me-2">2</span><i class="bi bi-columns-gap"></i> Unified Source Intake (RSS + Web) for General Niche</h6>
                     <form method="post" class="row g-2 mb-3">
                         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
                         <div class="col-md-5">
@@ -2944,21 +2421,9 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <select name="smart_target_niche_slug" class="form-select">
-                                <option value="">Optional niche link (falls back to active niche)</option>
-                                <?php $currentActiveNiche = (string)getSetting('active_niche', 'general'); ?>
-                                <?php foreach ($nichesList as $n): ?>
-                                    <option value="<?= e($n['slug']) ?>" <?= $currentActiveNiche === $n['slug'] ? 'selected' : '' ?>><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-1">
                             <button name="add_source_smart" value="1" class="btn btn-warning w-100" onclick="this.form.smart_source_preview.value='0';">Save Source</button>
                             <button name="add_source_smart" value="1" class="btn btn-outline-info w-100 mt-2" onclick="this.form.smart_source_preview.value='1';">Preview Parse</button>
                             <input type="hidden" name="smart_source_preview" value="0">
-                            <button name="fill_smart_sources_10_per_niche" value="1" class="btn btn-outline-light w-100 mt-2">Fill 10 RSS / Niche</button>
-                            <button name="fill_all_smart_hub_fields" value="1" class="btn btn-light w-100 mt-2">Fill All Fields</button>
-                            <button name="fill_closed_fields_all_niches" value="1" class="btn btn-secondary w-100 mt-2">Fill Closed Fields / All Niches</button>
                         </div>
                     </form>
                     <div class="alert alert-secondary small mb-3">
@@ -3167,7 +2632,7 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
             <div class="card section-card mb-3 panel-section" id="source-library" style="display:none;">
                 <div class="card-body">
                     <h5><i class="bi bi-folder2-open"></i> Global Source Library</h5>
-                    <p class="text-secondary mb-3">Manage global RSS and website sources that can be linked to niches.</p>
+                    <p class="text-secondary mb-3">Manage global RSS and website sources for the general automation niche.</p>
 
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
@@ -3184,15 +2649,7 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                                             <label class="form-label">Bulk RSS URLs</label>
                                             <textarea name="rss_urls" class="form-control" rows="3" placeholder="One RSS URL per line"></textarea>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Target Niche (optional)</label>
-                                            <select name="rss_target_niche_slug" class="form-select">
-                                                <option value="">None</option>
-                                                <?php foreach ($nichesList as $n): ?>
-                                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
+                                        <div class="alert alert-secondary py-2">All added RSS sources are linked to the general automation niche automatically.</div>
                                         <button name="add_rss" class="btn btn-outline-light w-100">Add RSS Source</button>
                                     </form>
                                 </div>
@@ -3212,15 +2669,7 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                                             <label class="form-label">Bulk Website URLs</label>
                                             <textarea name="web_urls" class="form-control" rows="3" placeholder="One website URL per line"></textarea>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Target Niche (optional)</label>
-                                            <select name="web_target_niche_slug" class="form-select">
-                                                <option value="">None</option>
-                                                <?php foreach ($nichesList as $n): ?>
-                                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
+                                        <div class="alert alert-secondary py-2">All added website sources are linked to the general automation niche automatically.</div>
                                         <button name="add_web" class="btn btn-outline-light w-100">Add Website Source</button>
                                     </form>
                                 </div>
