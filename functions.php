@@ -2909,30 +2909,7 @@ function generateArticle($title) {
     $content .= "<ul><li>How {$title} performs in real ownership conditions, not only in launch marketing.</li><li>Which trim strategy makes the most financial sense for different buyer types.</li><li>Where {$title} stands versus competitors in comfort, tech, efficiency, and long-term value.</li></ul>\n";
 
     $sections = getNicheSections($nicheType);
-            'segment fit and target audience clarity',
-            'how the model differentiates against direct rivals',
-            'the real value story behind headline marketing claims'
-        ],
-        'Exterior Design, Proportion, and Visual Character' => [
-            'surface treatment, stance, and brand identity execution',
-            'aerodynamic decisions that influence both style and efficiency',
-            'why design coherence affects owner satisfaction over time'
-        ],
-        'Cabin Quality, Space, and Human-Centered Ergonomics' => [
-            'seat comfort, posture support, and long-distance usability',
-            'dashboard hierarchy, physical controls, and interaction clarity',
-            'perceived quality through materials, fit, and acoustic control'
-        ],
-        'Powertrain Intelligence, Performance Delivery, and Efficiency' => [
-            'response quality under partial and full throttle situations',
-            'efficiency behavior in urban, mixed, and highway duty cycles',
-            'engineering trade-offs between excitement and sustainability'
-        ],
-        'Ride Comfort, Handling Balance, and Braking Confidence' => [
-            'suspension tuning over varied road surfaces',
-            'steering communication and directional stability at speed',
-            'predictable braking behavior in repeated real-world use'
-        ],
+
         'Technology Stack, Infotainment, and Connectivity Experience' => [
             'interface speed, readability, and cognitive simplicity',
             'smartphone integration and navigation reliability in practice',
