@@ -1,6 +1,10 @@
 <?php
 require_once 'config.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $composerAutoload = __DIR__ . '/vendor/autoload.php';
 if (is_file($composerAutoload)) {
     require_once $composerAutoload;

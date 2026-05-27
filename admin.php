@@ -3164,6 +3164,147 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                 </div>
             </div>
 
+            <div class="card section-card mb-3 panel-section" id="source-library" style="display:none;">
+                <div class="card-body">
+                    <h5><i class="bi bi-folder2-open"></i> Global Source Library</h5>
+                    <p class="text-secondary mb-3">Manage global RSS and website sources that can be linked to niches.</p>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-dark border-secondary h-100">
+                                <div class="card-body p-3">
+                                    <h6 class="mb-3">Add RSS Source</h6>
+                                    <form method="post">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                        <div class="mb-3">
+                                            <label class="form-label">Single RSS URL</label>
+                                            <input type="url" name="rss_url" class="form-control" placeholder="https://example.com/feed.xml">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Bulk RSS URLs</label>
+                                            <textarea name="rss_urls" class="form-control" rows="3" placeholder="One RSS URL per line"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Target Niche (optional)</label>
+                                            <select name="rss_target_niche_slug" class="form-select">
+                                                <option value="">None</option>
+                                                <?php foreach ($nichesList as $n): ?>
+                                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <button name="add_rss" class="btn btn-outline-light w-100">Add RSS Source</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-dark border-secondary h-100">
+                                <div class="card-body p-3">
+                                    <h6 class="mb-3">Add Website Source</h6>
+                                    <form method="post">
+                                        <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                        <div class="mb-3">
+                                            <label class="form-label">Single Website URL</label>
+                                            <input type="url" name="web_url" class="form-control" placeholder="https://example.com/news">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Bulk Website URLs</label>
+                                            <textarea name="web_urls" class="form-control" rows="3" placeholder="One website URL per line"></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Target Niche (optional)</label>
+                                            <select name="web_target_niche_slug" class="form-select">
+                                                <option value="">None</option>
+                                                <?php foreach ($nichesList as $n): ?>
+                                                    <option value="<?= e($n['slug']) ?>"><?= e($n['name']) ?> (<?= e($n['slug']) ?>)</option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <button name="add_web" class="btn btn-outline-light w-100">Add Website Source</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <div class="table-responsive rounded shadow-sm">
+                                <table class="table table-dark table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>RSS Source</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!$rssRows): ?>
+                                            <tr><td colspan="2" class="text-center text-secondary">No RSS sources yet.</td></tr>
+                                        <?php else: ?>
+                                            <?php foreach ($rssRows as $row): ?>
+                                                <tr>
+                                                    <td>
+                                                        <form method="post" class="row g-2 align-items-center">
+                                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                                            <input type="hidden" name="rss_id" value="<?= (int)$row['id'] ?>">
+                                                            <div class="col-12">
+                                                                <input type="url" name="rss_url" class="form-control form-control-sm" value="<?= e($row['url']) ?>" required>
+                                                            </div>
+                                                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                                                <button name="update_rss" class="btn btn-sm btn-outline-info">Save</button>
+                                                                <button name="delete_rss" value="<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this RSS source?');">Delete</button>
+                                                            </div>
+                                                        </form>
+                                                    </td>
+                                                    <td class="text-end"><span class="badge bg-secondary">#<?= (int)$row['id'] ?></span></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="table-responsive rounded shadow-sm">
+                                <table class="table table-dark table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Website Source</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (!$webRows): ?>
+                                            <tr><td colspan="2" class="text-center text-secondary">No website sources yet.</td></tr>
+                                        <?php else: ?>
+                                            <?php foreach ($webRows as $row): ?>
+                                                <tr>
+                                                    <td>
+                                                        <form method="post" class="row g-2 align-items-center">
+                                                            <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                                                            <input type="hidden" name="web_id" value="<?= (int)$row['id'] ?>">
+                                                            <div class="col-12">
+                                                                <input type="url" name="web_url" class="form-control form-control-sm" value="<?= e($row['url']) ?>" required>
+                                                            </div>
+                                                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                                                <button name="update_web" class="btn btn-sm btn-outline-info">Save</button>
+                                                                <button name="delete_web" value="<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this website source?');">Delete</button>
+                                                            </div>
+                                                        </form>
+                                                    </td>
+                                                    <td class="text-end"><span class="badge bg-secondary">#<?= (int)$row['id'] ?></span></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <div class="col-xl-12" id="content-data">
@@ -3411,7 +3552,8 @@ $configFingerprint = $configContents['fingerprint'] ?? '';
                 'auto-scheduler-section',
                 'pipeline-config-section',
                 'admin-password-settings',
-                'sources-management'
+                'sources-management',
+                'source-library'
             ];
 
             const orderedCards = requiredSectionIds
