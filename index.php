@@ -921,6 +921,7 @@ $sort = $_GET['sort'] ?? 'newest';
 $category = trim($_GET['category'] ?? '');
 $publishedFrom = normalizeDateInput($_GET['published_from'] ?? '');
 $publishedTo = normalizeDateInput($_GET['published_to'] ?? '');
+$activeNiche = getActiveNicheId();
 if ($publishedFrom !== '' && $publishedTo !== '' && $publishedFrom > $publishedTo) {
     [$publishedFrom, $publishedTo] = [$publishedTo, $publishedFrom];
 }
