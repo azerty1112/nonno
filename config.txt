@@ -56,7 +56,7 @@ ADS_HTML_CODE=<div class="ad-unit-inner">Place your ad code here</div>
 ADS_TXT=
 
 # Smart automation defaults
-SMART_ACTIVE_NICHE=general
+ACTIVE_NICHE=general
 SMART_AUTO_TITLE_MODE=template
 SMART_AUTO_TITLE_MIN_YEAR_OFFSET=0
 SMART_AUTO_TITLE_MAX_YEAR_OFFSET=1

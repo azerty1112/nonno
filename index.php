@@ -1135,7 +1135,7 @@ $baseQuery['per_page'] = $perPage;
     <?php
     // Show trending articles on homepage
     if ($slug === '' && $search === '' && $category === '' && $page === 1) {
-        $trending = getTrendingArticles(6, $activeNiche);
+        $trending = getTrendingArticles(6);
         if (!empty($trending)): ?>
             <section class="mb-4 p-4 rounded-4 bg-info bg-opacity-10 border border-info border-opacity-25">
                 <h2 class="h5 mb-3"><i class="bi bi-fire"></i> Trending Now</h2>

@@ -152,6 +152,21 @@ function getNicheArticleMeta($slug = '') {
         $introContext = 'market trends, opportunity analysis, and strategic recommendations';
     }
 
+    $customCategory = trim((string)getSetting('niche.' . $slugLower . '.category', ''));
+    if ($customCategory !== '') {
+        $category = $customCategory;
+    }
+
+    $customLabel = trim((string)getSetting('niche.' . $slugLower . '.label', ''));
+    if ($customLabel !== '') {
+        $label = $customLabel;
+    }
+
+    $customIntro = trim((string)getSetting('niche.' . $slugLower . '.intro_context', ''));
+    if ($customIntro !== '') {
+        $introContext = $customIntro;
+    }
+
     return [
         'slug' => $info['slug'],
         'name' => $name,
@@ -160,6 +175,127 @@ function getNicheArticleMeta($slug = '') {
         'category' => $category,
         'intro_context' => $introContext,
     ];
+}
+
+function getNicheContentType(array $nicheMeta) {
+    $slug = mb_strtolower(trim((string)$nicheMeta['slug']), 'UTF-8');
+    $label = mb_strtolower(trim((string)$nicheMeta['label']), 'UTF-8');
+
+    if ($slug === 'cuisine' || str_contains($label, 'food') || str_contains($label, 'recipe')) {
+        return 'food';
+    }
+    if (str_contains($slug, 'money') || str_contains($slug, 'finance') || str_contains($label, 'finance') || str_contains($label, 'business')) {
+        return 'finance';
+    }
+    if ($slug === 'ev' || $slug === 'motorcycles' || str_contains($label, 'vehicle') || str_contains($label, 'auto') || str_contains($label, 'car') || str_contains($label, 'motorcycle')) {
+        return 'auto';
+    }
+
+    return 'general';
+}
+
+function getNicheSections($nicheType) {
+    switch ($nicheType) {
+        case 'food':
+            return [
+                'Recipe Overview and Purpose' => [
+                    'dish intent, target eater, and recipe style',
+                    'what makes this recipe different from common alternatives',
+                    'how the finished dish should feel in terms of texture and flavor balance'
+                ],
+                'Ingredients and Preparation Notes' => [
+                    'the quality of core ingredients and why they matter',
+                    'critical technique points that determine success',
+                    'time, tools, and skill level required for the recipe'
+                ],
+                'Flavor Profile and Serving Suggestions' => [
+                    'the main taste identities and how they combine',
+                    'pairing ideas that complement the dish rather than overpower it',
+                    'presentation and garnish advice for better enjoyment'
+                ],
+                'Nutrition, Value, and Practical Use' => [
+                    'how the recipe fits into daily meal planning or special occasions',
+                    'value for money considering pantry ingredients and preparation effort',
+                    'what readers should expect in terms of leftovers, reheating, or storage'
+                ],
+                'Final Verdict and Reader Recommendation' => [
+                    'who benefits most from making this dish',
+                    'what to watch for when choosing variations or substitutions',
+                    'why this recipe earns a place in the reader’s regular cooking rotation'
+                ],
+            ];
+        case 'finance':
+            return [
+                'What This Topic Delivers' => [
+                    'the practical business or financial outcome it targets',
+                    'how it differs from common alternatives or simpler approaches',
+                    'the type of reader who benefits most from it'
+                ],
+                'Cost, Risk, and Reward' => [
+                    'the main risks to watch for before committing',
+                    'the reward profile in terms of savings, returns, or efficiency',
+                    'how to compare it with other viable options'
+                ],
+                'Implementation and Usage Guidance' => [
+                    'the steps needed to put this concept into practice',
+                    'common mistakes and how to avoid them',
+                    'where this approach fits into broader financial planning'
+                ],
+                'Audience Scenarios' => [
+                    'which reader segments should prioritize it',
+                    'how the recommendation changes depending on goals',
+                    'the key questions to ask before choosing it'
+                ],
+                'Final Verdict and Strategic Recommendation' => [
+                    'whether this topic is worth action now',
+                    'the main conditions under which it makes the most sense',
+                    'what a smart reader should do next'
+                ],
+            ];
+        default:
+            return [
+                'Executive Summary and Market Position' => [
+                    'segment fit and target audience clarity',
+                    'how the model differentiates against direct rivals',
+                    'the real value story behind headline marketing claims'
+                ],
+                'Exterior Design, Proportion, and Visual Character' => [
+                    'surface treatment, stance, and brand identity execution',
+                    'aerodynamic decisions that influence both style and efficiency',
+                    'why design coherence affects owner satisfaction over time'
+                ],
+                'Cabin Quality, Space, and Human-Centered Ergonomics' => [
+                    'seat comfort, posture support, and long-distance usability',
+                    'dashboard hierarchy, physical controls, and interaction clarity',
+                    'perceived quality through materials, fit, and acoustic control'
+                ],
+                'Powertrain Intelligence, Performance Delivery, and Efficiency' => [
+                    'response quality under partial and full throttle situations',
+                    'efficiency behavior in urban, mixed, and highway duty cycles',
+                    'engineering trade-offs between excitement and sustainability'
+                ],
+                'Ride Comfort, Handling Balance, and Braking Confidence' => [
+                    'suspension tuning over varied road surfaces',
+                    'steering communication and directional stability at speed',
+                    'predictable braking behavior in repeated real-world use'
+                ],
+                'Technology Stack, Infotainment, and Connectivity Experience' => [
+                    'interface speed, readability, and cognitive simplicity',
+                    'smartphone integration and navigation reliability in practice',
+                    'software maturity, update path, and feature longevity'
+                ],
+                'Safety Systems, Driver Assistance, and Durability Outlook' => [
+                    'calibration quality of active safety interventions',
+                    'passive safety confidence and structural reassurance',
+                    'maintenance predictability and long-term reliability perception'
+                ],
+                'Ownership Economics, Trim Strategy, and Buyer Recommendations' => [
+                    'cost of ownership across fuel or charging, service, and insurance',
+                    'which configuration levels provide the strongest value density',
+                    'how to shortlist based on real priorities rather than hype'
+                ],
+            ];
+    }
 }
 
 /**
@@ -2209,34 +2345,77 @@ function pickRandomFrom(array $items) {
     return $items[array_rand($items)];
 }
 
-function buildAnalyticalParagraph($title, $sectionTitle, $focus, $isEV, $perspective) {
-    $energyContext = $isEV
-        ? 'its electric architecture, battery management logic, and charging ecosystem'
-        : 'its engine calibration, transmission strategy, and thermal durability';
+function buildAnalyticalParagraph($title, $sectionTitle, $focus, $nicheType, $perspective) {
+    $energyContext = $nicheType === 'auto'
+        ? ($sectionTitle === 'Powertrain Intelligence, Performance Delivery, and Efficiency'
+            ? 'its electric architecture, battery management logic, and charging ecosystem'
+            : 'its engine calibration, transmission strategy, and thermal durability')
+        : 'its practical characteristics, execution quality, and real-world suitability';
 
-    $openingBank = [
-        "In the context of {$sectionTitle}, the {$title} deserves attention for {$focus}.",
-        "Looking at {$sectionTitle} through a practical lens, {$focus} becomes one of the most relevant points for {$title}.",
-        "When analysts evaluate {$sectionTitle}, they usually start with {$focus}, and the {$title} performs in a convincing way."
-    ];
-
-    $analysisBank = [
-        "The most credible part of this story is not a single headline figure, but the consistency of behavior across daily scenarios like traffic, highway cruising, and weekend travel.",
-        "What separates mature products from average ones is repeatability, and here the vehicle keeps a stable character even when road quality, weather, and load conditions change.",
-        "Instead of over-optimizing for lab-style results, the package appears tuned for real-world confidence where comfort, control, and predictability matter every day."
-    ];
-
-    $perspectiveBank = [
-        "From an owner perspective, this means fewer compromises between comfort and capability, and a lower chance of buyer regret after the first months of excitement.",
-        "For mixed-use drivers, this creates a meaningful advantage: the car feels refined in city conditions yet remains composed when pushed on open roads.",
-        "From a long-term standpoint, this balance supports stronger perceived quality because the driving experience remains coherent rather than fragmented."
-    ];
-
-    $closingBank = [
-        "That broader coherence is reinforced by {$energyContext}, which helps the {$title} translate engineering choices into tangible daily benefits.",
-        "The result is a clearer value proposition: the {$title} is not merely impressive on paper, it is understandable and rewarding in normal ownership use.",
-        "Ultimately, this is where product intelligence appears—different systems collaborate naturally instead of competing for attention."
-    ];
+    if ($nicheType === 'food') {
+        $openingBank = [
+            "For {$sectionTitle}, the {$title} should be judged by {$focus} in a kitchen-friendly way.",
+            "When considering {$sectionTitle}, the most useful point is {$focus} for a satisfying final dish.",
+            "A strong {$title} recipe stands out when {$focus} is handled with clarity and practical technique."
+        ];
+        $analysisBank = [
+            "The key to a good result is consistency in flavor, texture, and timing rather than chasing complex tricks.",
+            "A home cook benefits from predictable steps, understandable ingredients, and a final result that tastes balanced.",
+            "This recipe succeeds when the elements work together without overwhelming the main character of the dish."
+        ];
+        $perspectiveBank = [
+            "For everyday cooking, that means fewer surprises and more confidence in the outcome.",
+            "When you prepare this for guests, the most memorable part should be the harmony of flavors and the ease of execution.",
+            "A practical recipe is one you are happy to make again, not one that only looks impressive on the first try."
+        ];
+        $closingBank = [
+            "That kind of coherence is what makes {$title} feel like a dependable kitchen choice rather than a one-off experiment.",
+            "In the end, a successful dish is judged by how well it delivers enjoyment, repeatability, and sensible preparation.",
+            "Ultimately, this is a recipe you want to return to because it balances taste, effort, and reliability."
+        ];
+    } elseif ($nicheType === 'finance') {
+        $openingBank = [
+            "In the context of {$sectionTitle}, the {$title} should be measured by {$focus}.",
+            "This topic becomes meaningful when {$focus} is evaluated against real financial outcomes.",
+            "A smart decision is built around {$focus}, and that matters more than flashy short-term claims."
+        ];
+        $analysisBank = [
+            "The stronger signal here is long-term clarity rather than a single headline benefit.",
+            "Consistent results come from predictable assumptions and a realistic view of risk, not from overly aggressive projections.",
+            "What sets good advice apart is the practical alignment with your goals, time frame, and tolerance for complexity."
+        ];
+        $perspectiveBank = [
+            "For a business owner or investor, the right choice usually means a lower chance of regret later on.",
+            "When resources are constrained, the best outcomes come from decisions that balance growth potential with discipline.",
+            "A conservative approach can still be attractive if it preserves flexibility and reduces unnecessary exposure."
+        ];
+        $closingBank = [
+            "That kind of discipline is what helps the {$title} translate theory into reliable decision-making.",
+            "In practice, the best strategy is one that remains sensible under different market conditions.",
+            "Ultimately, the strongest case is built on real-world execution, not just appealing jargon."
+        ];
+    } else {
+        $openingBank = [
+            "In the context of {$sectionTitle}, the {$title} deserves attention for {$focus}.",
+            "Looking at {$sectionTitle} through a practical lens, {$focus} becomes one of the most relevant points for {$title}.",
+            "When analysts evaluate {$sectionTitle}, they usually start with {$focus}, and the {$title} performs in a convincing way."
+        ];
+        $analysisBank = [
+            "The most credible part of this story is not a single headline figure, but the consistency of behavior across daily scenarios like traffic, highway cruising, and weekend travel.",
+            "What separates mature products from average ones is repeatability, and here the vehicle keeps a stable character even when road quality, weather, and load conditions change.",
+            "Instead of over-optimizing for lab-style results, the package appears tuned for real-world confidence where comfort, control, and predictability matter every day."
+        ];
+        $perspectiveBank = [
+            "From an owner perspective, this means fewer compromises between comfort and capability, and a lower chance of buyer regret after the first months of excitement.",
+            "For mixed-use drivers, this creates a meaningful advantage: the car feels refined in city conditions yet remains composed when pushed on open roads.",
+            "From a long-term standpoint, this balance supports stronger perceived quality because the driving experience remains coherent rather than fragmented."
+        ];
+        $closingBank = [
+            "That broader coherence is reinforced by {$energyContext}, which helps the {$title} translate engineering choices into tangible daily benefits.",
+            "The result is a clearer value proposition: the {$title} is not merely impressive on paper, it is understandable and rewarding in normal ownership use.",
+            "Ultimately, this is where product intelligence appears—different systems collaborate naturally instead of competing for attention."
+        ];
+    }
 
     $paragraph = pickRandomFrom($openingBank) . ' '
         . pickRandomFrom($analysisBank) . ' '
@@ -2250,7 +2429,7 @@ function buildAnalyticalParagraph($title, $sectionTitle, $focus, $isEV, $perspec
     return "<p>{$paragraph}</p>";
 }
 
-function buildSectionContent($title, $sectionTitle, array $focusPoints, $isEV) {
+function buildSectionContent($title, $sectionTitle, array $focusPoints, $nicheType, array $nicheMeta) {
     $perspectives = [
         'This is especially important in segments where buyers compare six or seven alternatives before committing.',
         'In competitive markets, small gains in usability often influence purchase decisions more than aggressive marketing claims.',
@@ -2263,7 +2442,7 @@ function buildSectionContent($title, $sectionTitle, array $focusPoints, $isEV) {
             $title,
             $sectionTitle,
             $focus,
-            $isEV,
+            $nicheType,
             $perspectives[$index % count($perspectives)]
         );
     }
@@ -2701,9 +2880,13 @@ function generateArticle($title) {
 
     $activeNicheSlug = getActiveNicheSlug();
     $nicheMeta = getNicheArticleMeta($activeNicheSlug);
+    $nicheType = getNicheContentType($nicheMeta);
     $model = trim(preg_replace('/\b(202[0-9]|20[0-9]{2})\b/', '', $title));
     $isEV = stripos($title, 'EV') !== false || stripos($title, 'electric') !== false || str_contains(mb_strtolower($nicheMeta['slug'], 'UTF-8'), 'ev');
     $bodyType = classifyVehicleProfile($title);
+    if ($nicheType !== 'auto') {
+        $bodyType = ucfirst($nicheType);
+    }
     $topicContext = trim((string)$nicheMeta['intro_context']);
     if ($topicContext === '') {
         $topicContext = 'audience expectations, topical relevance, and niche-specific value';
@@ -2725,8 +2908,7 @@ function generateArticle($title) {
     $content .= "<h2>What You Will Learn in This Guide</h2>\n";
     $content .= "<ul><li>How {$title} performs in real ownership conditions, not only in launch marketing.</li><li>Which trim strategy makes the most financial sense for different buyer types.</li><li>Where {$title} stands versus competitors in comfort, tech, efficiency, and long-term value.</li></ul>\n";
 
-    $sections = [
-        'Executive Summary and Market Position' => [
+    $sections = getNicheSections($nicheType);
             'segment fit and target audience clarity',
             'how the model differentiates against direct rivals',
             'the real value story behind headline marketing claims'
@@ -2773,7 +2955,7 @@ function generateArticle($title) {
         $sectionId = buildHeadingAnchorId($sectionTitle, 'section-' . (count($tocSections) + 1));
         $tocSections[] = ['title' => $sectionTitle, 'id' => $sectionId];
         $content .= "<h2 id='" . e($sectionId) . "'>{$sectionTitle}</h2>\n";
-        foreach (buildSectionContent($title, $sectionTitle, $focusPoints, $isEV) as $paragraph) {
+        foreach (buildSectionContent($title, $sectionTitle, $focusPoints, $nicheType, $nicheMeta) as $paragraph) {
             $content .= $paragraph . "\n";
         }
     }

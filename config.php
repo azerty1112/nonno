@@ -20,6 +20,10 @@ function loadConfigTxt($path) {
         return ['settings' => [], 'niches' => [], 'sources' => ['rss' => [], 'web' => []]];
     }
 
+    $configKeyAliases = [
+        'smart_active_niche' => 'active_niche',
+    ];
+
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     $settings = [];
     $niches = [];
@@ -38,7 +42,12 @@ function loadConfigTxt($path) {
 
         $key = trim($parts[0]);
         $value = trim($parts[1]);
-        if (str_starts_with($key, 'NICHE_')) {
+        $normalized = normalizeConfigKey($key);
+        if (isset($configKeyAliases[$normalized])) {
+            $normalized = $configKeyAliases[$normalized];
+        }
+
+        if (str_starts_with($normalized, 'niche_')) {
             if (!preg_match('/^NICHE_([A-Z0-9_]+)_(.+)$/', $key, $matches)) {
                 continue;
             }
@@ -54,7 +63,6 @@ function loadConfigTxt($path) {
                 $niches[$slug][$field] = $value;
             }
         } else {
-            $normalized = normalizeConfigKey($key);
             if (in_array($normalized, ['rss_sources', 'web_sources'], true)) {
                 $type = $normalized === 'rss_sources' ? 'rss' : 'web';
                 $sources[$type] = parseConfigList($value, [',', '|']);
@@ -119,6 +127,9 @@ function syncConfigNiches(PDO $pdo, array $niches) {
             'mode' => 'auto_title_mode',
             'min_year_offset' => 'auto_title_min_year_offset',
             'max_year_offset' => 'auto_title_max_year_offset',
+            'intro_context' => 'intro_context',
+            'category' => 'category',
+            'label' => 'label',
         ];
         foreach ($nicheSettingsMap as $field => $settingKey) {
             if (isset($nicheData[$field])) {
