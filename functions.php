@@ -2908,8 +2908,7 @@ function generateArticle($title) {
     $content .= "<h2>What You Will Learn in This Guide</h2>\n";
     $content .= "<ul><li>How {$title} performs in real ownership conditions, not only in launch marketing.</li><li>Which trim strategy makes the most financial sense for different buyer types.</li><li>Where {$title} stands versus competitors in comfort, tech, efficiency, and long-term value.</li></ul>\n";
 
-    $sections = getNicheSections($nicheType);
-
+    $sections = array_merge(getNicheSections($nicheType), [
         'Technology Stack, Infotainment, and Connectivity Experience' => [
             'interface speed, readability, and cognitive simplicity',
             'smartphone integration and navigation reliability in practice',
@@ -2925,7 +2924,7 @@ function generateArticle($title) {
             'which configuration levels provide the strongest value density',
             'how to shortlist based on real priorities rather than hype'
         ]
-    ];
+    ]);
 
     $tocSections = [];
     foreach ($sections as $sectionTitle => $focusPoints) {
